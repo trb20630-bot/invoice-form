@@ -663,7 +663,19 @@ async function syncFromServer(){
     const d = await r.json();
     if(d.ok && Array.isArray(d.records)){
       S.records = d.records;
+      // 根據 server 最新資料推算 S.current（取最大 invNum 的數字部分 + 1）
+      if(d.records.length > 0 && S.prefix){
+        const nums = d.records.map(r => parseInt(String(r.invNum).replace(/^[A-Z]+/,''))).filter(n=>!isNaN(n));
+        if(nums.length){
+          const maxNum = Math.max(...nums);
+          // 只在 server 的號碼比本地大時才更新（避免倒退）
+          if(S.current === null || maxNum >= S.current){
+            S.current = maxNum + 1;
+          }
+        }
+      }
       save();
+      refreshMain();
       setSyncDot('ok');
       return true;
     }
