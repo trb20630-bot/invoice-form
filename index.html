@@ -688,10 +688,11 @@ async function gasSave(payload){
   if(!S.gasUrl) return;
   setSyncDot('syncing');
   try{
-    await fetch(S.gasUrl, {method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(payload)});
-    setSyncDot('ok');
+    const params = new URLSearchParams(payload).toString();
+    const r = await fetch(S.gasUrl + '?' + params + '&t=' + Date.now());
+    const d = await r.json();
+    setSyncDot(d.ok ? 'ok' : 'err');
+    return d;
   }catch(e){ setSyncDot('err'); }
 }
 
@@ -806,11 +807,8 @@ async function doConfirm(){
   const rec={ seq:S.records.length+1, invNum, date:today, amount:amt, voided:false };
 
   if(S.gasUrl){
-    try{
-      const r=await fetch(S.gasUrl,{method:'POST',body:JSON.stringify({action:'saveInvoice',...rec,sellerName:'小花著衣店',sellerTaxId:'72774995',sellerRegId:'304309040'})});
-      const j=await r.json();
-      if(j.result!=='ok'){ toast('儲存失敗：'+(j.error||''),true); return; }
-    }catch(e){ toast('連線失敗',true); return; }
+    const j = await gasSave({ action:'saveInvoice', invNum:rec.invNum, date:rec.date, amount:rec.amount });
+    if(!j || !j.ok){ toast('儲存失敗：'+(j?.error||''), true); return; }
   }
 
   S.records.push(rec); S.current++;
@@ -891,7 +889,7 @@ function clickUnvoid(e,i){
 }
 async function syncVoid(i,val){
   S.records[i].voided=val;
-  if(S.gasUrl){ try{ await fetch(S.gasUrl,{method:'POST',body:JSON.stringify({action:'updateRecord',seq:S.records[i].seq,voided:val})}); }catch(e){} }
+  if(S.gasUrl){ await gasSave({action:'updateRecord', seq:S.records[i].seq, voided:val}); }
   save(); selIdx=null; editIdx=null; renderHist(); updateFooter(); updateSummary();
   toast(val?'✓ 已標記作廢，列上可按「取消作廢」':'✓ 已取消作廢');
 }
